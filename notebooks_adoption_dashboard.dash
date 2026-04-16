@@ -1,0 +1,270 @@
+{
+  "title": "Notebooks Adoption Trends — Largest Customers",
+  "widgets": {
+    "kpi-accounts": {
+      "id": "kpi-accounts",
+      "type": "scorecard",
+      "title": "Active Capacity Accounts (30d)",
+      "source": {
+        "sql": "SELECT COUNT(DISTINCT CASE WHEN users_spcs + users_vnext + users_wh > 0 THEN ad.account_id || ad.deployment END) AS ACTIVE_ACCOUNTS FROM SNOWSCIENCE.UI.NOTEBOOK_ACCOUNT_DAY_FACT ad INNER JOIN SNOWSCIENCE.DIMENSIONS.DIM_ACCOUNTS_HISTORY a ON ad.account_id = a.snowflake_account_id AND ad.deployment = a.snowflake_deployment AND ad.ds = a.general_date WHERE ad.ds >= CURRENT_DATE - 30 AND a.is_active_capacity_finance = TRUE AND a.is_internal_organization = FALSE"
+      },
+      "valueColumn": "ACTIVE_ACCOUNTS",
+      "note": "Non-internal capacity accounts"
+    },
+    "kpi-users": {
+      "id": "kpi-users",
+      "type": "scorecard",
+      "title": "Distinct Active Users (30d)",
+      "source": {
+        "sql": "SELECT COUNT(DISTINCT ud.user_id || ud.account_id || ud.deployment) AS ACTIVE_USERS FROM SNOWSCIENCE.UI.NOTEBOOK_USER_DAY_FACT ud INNER JOIN SNOWSCIENCE.DIMENSIONS.DIM_ACCOUNTS_HISTORY a ON ud.account_id = a.snowflake_account_id AND ud.deployment = a.snowflake_deployment AND ud.ds = a.general_date WHERE ud.ds >= CURRENT_DATE - 30 AND a.is_active_capacity_finance = TRUE AND a.is_internal_organization = FALSE AND (ud.cell_runs_vnext + ud.cell_runs_spcs + ud.cell_runs_wh + ud.sessions_vnext + ud.sessions_spcs + ud.sessions_wh) > 0"
+      },
+      "valueColumn": "ACTIVE_USERS",
+      "note": "Capacity customers only"
+    },
+    "kpi-credits": {
+      "id": "kpi-credits",
+      "type": "scorecard",
+      "title": "Total Notebook Credits (30d)",
+      "source": {
+        "sql": "SELECT ROUND(SUM(total_credits_vnext + total_credits_spcs + total_credits_wh), 0) AS TOTAL_CREDITS FROM SNOWSCIENCE.UI.NOTEBOOK_ACCOUNT_DAY_FACT ad INNER JOIN SNOWSCIENCE.DIMENSIONS.DIM_ACCOUNTS_HISTORY a ON ad.account_id = a.snowflake_account_id AND ad.deployment = a.snowflake_deployment AND ad.ds = a.general_date WHERE ad.ds >= CURRENT_DATE - 30 AND a.is_active_capacity_finance = TRUE AND a.is_internal_organization = FALSE"
+      },
+      "valueColumn": "TOTAL_CREDITS",
+      "note": "All notebook types combined"
+    },
+    "kpi-vnext": {
+      "id": "kpi-vnext",
+      "type": "scorecard",
+      "title": "Workspaces (vnext) Adoption % (30d)",
+      "source": {
+        "sql": "SELECT ROUND(SUM(users_vnext) * 100.0 / NULLIF(SUM(users_vnext + users_spcs + users_wh), 0), 1) AS VNEXT_ADOPTION_PCT FROM SNOWSCIENCE.UI.NOTEBOOK_ACCOUNT_DAY_FACT ad INNER JOIN SNOWSCIENCE.DIMENSIONS.DIM_ACCOUNTS_HISTORY a ON ad.account_id = a.snowflake_account_id AND ad.deployment = a.snowflake_deployment AND ad.ds = a.general_date WHERE ad.ds >= CURRENT_DATE - 30 AND a.is_active_capacity_finance = TRUE AND a.is_internal_organization = FALSE"
+      },
+      "valueColumn": "VNEXT_ADOPTION_PCT",
+      "note": "% of user-days on Workspaces vs legacy"
+    },
+    "weekly-users-trend": {
+      "id": "weekly-users-trend",
+      "type": "chart",
+      "title": "Weekly Active Users by Notebook Platform (Last 90d)",
+      "source": {
+        "sql": "WITH base AS (SELECT ad.ds, ad.users_vnext, ad.users_spcs, ad.users_wh FROM SNOWSCIENCE.UI.NOTEBOOK_ACCOUNT_DAY_FACT ad INNER JOIN SNOWSCIENCE.DIMENSIONS.DIM_ACCOUNTS_HISTORY a ON ad.account_id = a.snowflake_account_id AND ad.deployment = a.snowflake_deployment AND ad.ds = a.general_date WHERE ad.ds >= CURRENT_DATE - 90 AND a.is_active_capacity_finance = TRUE AND a.is_internal_organization = FALSE) SELECT DATE_TRUNC('week', ds) AS WEEK, 'vnext (Workspaces)' AS PLATFORM, SUM(users_vnext) AS USERS FROM base GROUP BY 1, 2 UNION ALL SELECT DATE_TRUNC('week', ds), 'vcurrent SPCS', SUM(users_spcs) FROM base GROUP BY 1, 2 UNION ALL SELECT DATE_TRUNC('week', ds), 'vcurrent WH', SUM(users_wh) FROM base GROUP BY 1, 2 ORDER BY 1, 2"
+      },
+      "vega": {
+        "mark": "line",
+        "encoding": {
+          "x": {
+            "field": "WEEK",
+            "type": "temporal",
+            "title": "Week"
+          },
+          "y": {
+            "field": "USERS",
+            "type": "quantitative",
+            "title": "User-Days"
+          },
+          "color": {
+            "field": "PLATFORM",
+            "type": "nominal",
+            "title": "Platform"
+          }
+        }
+      }
+    },
+    "platform-mix": {
+      "id": "platform-mix",
+      "type": "chart",
+      "title": "Platform Mix — User-Days (30d)",
+      "source": {
+        "sql": "WITH base AS (SELECT SUM(users_vnext) AS vnext_users, SUM(users_spcs) AS spcs_users, SUM(users_wh) AS wh_users FROM SNOWSCIENCE.UI.NOTEBOOK_ACCOUNT_DAY_FACT ad INNER JOIN SNOWSCIENCE.DIMENSIONS.DIM_ACCOUNTS_HISTORY a ON ad.account_id = a.snowflake_account_id AND ad.deployment = a.snowflake_deployment AND ad.ds = a.general_date WHERE ad.ds >= CURRENT_DATE - 30 AND a.is_active_capacity_finance = TRUE AND a.is_internal_organization = FALSE) SELECT 'vnext (Workspaces)' AS PLATFORM, vnext_users AS USERS FROM base UNION ALL SELECT 'vcurrent SPCS', spcs_users FROM base UNION ALL SELECT 'vcurrent WH', wh_users FROM base"
+      },
+      "vega": {
+        "mark": "arc",
+        "encoding": {
+          "theta": {
+            "field": "USERS",
+            "type": "quantitative"
+          },
+          "color": {
+            "field": "PLATFORM",
+            "type": "nominal",
+            "title": "Platform"
+          },
+          "tooltip": [
+            {
+              "field": "PLATFORM",
+              "type": "nominal"
+            },
+            {
+              "field": "USERS",
+              "type": "quantitative"
+            }
+          ]
+        }
+      }
+    },
+    "weekly-credits-trend": {
+      "id": "weekly-credits-trend",
+      "type": "chart",
+      "title": "Weekly Notebook Credits by Platform (Last 90d)",
+      "source": {
+        "sql": "WITH base AS (SELECT ad.ds, ad.total_credits_vnext, ad.total_credits_spcs, ad.total_credits_wh FROM SNOWSCIENCE.UI.NOTEBOOK_ACCOUNT_DAY_FACT ad INNER JOIN SNOWSCIENCE.DIMENSIONS.DIM_ACCOUNTS_HISTORY a ON ad.account_id = a.snowflake_account_id AND ad.deployment = a.snowflake_deployment AND ad.ds = a.general_date WHERE ad.ds >= CURRENT_DATE - 90 AND a.is_active_capacity_finance = TRUE AND a.is_internal_organization = FALSE) SELECT DATE_TRUNC('week', ds) AS WEEK, 'vnext (Workspaces)' AS PLATFORM, ROUND(SUM(total_credits_vnext), 1) AS CREDITS FROM base GROUP BY 1, 2 UNION ALL SELECT DATE_TRUNC('week', ds), 'vcurrent SPCS', ROUND(SUM(total_credits_spcs), 1) FROM base GROUP BY 1, 2 UNION ALL SELECT DATE_TRUNC('week', ds), 'vcurrent WH', ROUND(SUM(total_credits_wh), 1) FROM base GROUP BY 1, 2 ORDER BY 1, 2"
+      },
+      "vega": {
+        "mark": "line",
+        "encoding": {
+          "x": {
+            "field": "WEEK",
+            "type": "temporal",
+            "title": "Week"
+          },
+          "y": {
+            "field": "CREDITS",
+            "type": "quantitative",
+            "title": "Credits"
+          },
+          "color": {
+            "field": "PLATFORM",
+            "type": "nominal",
+            "title": "Platform"
+          }
+        }
+      }
+    },
+    "top25-bar": {
+      "id": "top25-bar",
+      "type": "chart",
+      "title": "Top 25 Capacity Accounts by Notebook Credits (Last 30d)",
+      "source": {
+        "sql": "SELECT a.salesforce_account_name AS ACCOUNT, ROUND(SUM(ad.total_credits_vnext + ad.total_credits_spcs + ad.total_credits_wh), 1) AS TOTAL_CREDITS FROM SNOWSCIENCE.UI.NOTEBOOK_ACCOUNT_DAY_FACT ad INNER JOIN SNOWSCIENCE.DIMENSIONS.DIM_ACCOUNTS_HISTORY a ON ad.account_id = a.snowflake_account_id AND ad.deployment = a.snowflake_deployment AND ad.ds = a.general_date WHERE ad.ds >= CURRENT_DATE - 30 AND a.is_active_capacity_finance = TRUE AND a.is_internal_organization = FALSE GROUP BY a.salesforce_account_name ORDER BY TOTAL_CREDITS DESC NULLS LAST LIMIT 25"
+      },
+      "vega": {
+        "mark": "bar",
+        "encoding": {
+          "y": {
+            "field": "ACCOUNT",
+            "type": "nominal",
+            "sort": "-x",
+            "title": "Account"
+          },
+          "x": {
+            "field": "TOTAL_CREDITS",
+            "type": "quantitative",
+            "title": "Total Credits"
+          },
+          "tooltip": [
+            {
+              "field": "ACCOUNT",
+              "type": "nominal"
+            },
+            {
+              "field": "TOTAL_CREDITS",
+              "type": "quantitative"
+            }
+          ]
+        }
+      }
+    },
+    "top25-table": {
+      "id": "top25-table",
+      "type": "table",
+      "title": "Top 25 Capacity Accounts — Adoption Detail (Last 30d)",
+      "source": {
+        "sql": "SELECT a.salesforce_account_name AS ACCOUNT, a.industry AS INDUSTRY, a.segment AS SEGMENT, ROUND(SUM(ad.total_credits_vnext + ad.total_credits_spcs + ad.total_credits_wh), 1) AS TOTAL_CREDITS, ROUND(SUM(ad.total_credits_vnext) * 100.0 / NULLIF(SUM(ad.total_credits_vnext + ad.total_credits_spcs + ad.total_credits_wh), 0), 1) AS VNEXT_CREDIT_PCT, SUM(ad.users_vnext) AS VNEXT_USER_DAYS, SUM(ad.users_spcs + ad.users_wh) AS LEGACY_USER_DAYS, SUM(ad.notebooks_vnext) AS VNEXT_NOTEBOOKS FROM SNOWSCIENCE.UI.NOTEBOOK_ACCOUNT_DAY_FACT ad INNER JOIN SNOWSCIENCE.DIMENSIONS.DIM_ACCOUNTS_HISTORY a ON ad.account_id = a.snowflake_account_id AND ad.deployment = a.snowflake_deployment AND ad.ds = a.general_date WHERE ad.ds >= CURRENT_DATE - 30 AND a.is_active_capacity_finance = TRUE AND a.is_internal_organization = FALSE GROUP BY a.salesforce_account_name, a.industry, a.segment ORDER BY TOTAL_CREDITS DESC NULLS LAST LIMIT 25"
+      },
+      "columns": [
+        "ACCOUNT",
+        "INDUSTRY",
+        "SEGMENT",
+        "TOTAL_CREDITS",
+        "VNEXT_CREDIT_PCT",
+        "VNEXT_USER_DAYS",
+        "LEGACY_USER_DAYS",
+        "VNEXT_NOTEBOOKS"
+      ]
+    }
+  },
+  "layout": {
+    "default": [
+      {
+        "w": 3,
+        "h": 2,
+        "x": 0,
+        "y": 0,
+        "i": "kpi-accounts",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 3,
+        "h": 2,
+        "x": 3,
+        "y": 0,
+        "i": "kpi-users",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 3,
+        "h": 2,
+        "x": 6,
+        "y": 0,
+        "i": "kpi-credits",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 3,
+        "h": 2,
+        "x": 9,
+        "y": 0,
+        "i": "kpi-vnext",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 8,
+        "h": 5,
+        "x": 0,
+        "y": 2,
+        "i": "weekly-users-trend",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 4,
+        "h": 5,
+        "x": 8,
+        "y": 2,
+        "i": "platform-mix",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 12,
+        "h": 5,
+        "x": 0,
+        "y": 7,
+        "i": "weekly-credits-trend",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 12,
+        "h": 7,
+        "x": 0,
+        "y": 12,
+        "i": "top25-bar",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 12,
+        "h": 7,
+        "x": 0,
+        "y": 19,
+        "i": "top25-table",
+        "moved": false,
+        "static": false
+      }
+    ]
+  }
+}
