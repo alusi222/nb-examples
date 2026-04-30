@@ -1,0 +1,369 @@
+{
+  "title": "Ticket Sales Trends",
+  "widgets": {
+    "kpi-revenue": {
+      "id": "kpi-revenue",
+      "type": "scorecard",
+      "title": "Total Revenue",
+      "source": {
+        "sql": "SELECT '$' || TO_VARCHAR(ROUND(SUM(pricepaid) / 1000000, 2)) || 'M' AS TOTAL FROM samples.tickit.sales"
+      },
+      "valueColumn": "TOTAL",
+      "note": "Gross ticket revenue"
+    },
+    "kpi-tickets": {
+      "id": "kpi-tickets",
+      "type": "scorecard",
+      "title": "Tickets Sold",
+      "source": {
+        "sql": "SELECT TO_VARCHAR(SUM(qtysold)) AS TOTAL FROM samples.tickit.sales"
+      },
+      "valueColumn": "TOTAL",
+      "note": "All time"
+    },
+    "kpi-buyers": {
+      "id": "kpi-buyers",
+      "type": "scorecard",
+      "title": "Unique Buyers",
+      "source": {
+        "sql": "SELECT TO_VARCHAR(COUNT(DISTINCT buyerid)) AS TOTAL FROM samples.tickit.sales"
+      },
+      "valueColumn": "TOTAL",
+      "note": "Distinct buyer IDs"
+    },
+    "kpi-events": {
+      "id": "kpi-events",
+      "type": "scorecard",
+      "title": "Events",
+      "source": {
+        "sql": "SELECT TO_VARCHAR(COUNT(DISTINCT eventid)) AS TOTAL FROM samples.tickit.sales"
+      },
+      "valueColumn": "TOTAL",
+      "note": "Distinct events"
+    },
+    "daily-revenue": {
+      "id": "daily-revenue",
+      "type": "chart",
+      "title": "Daily Revenue Trend (Gross vs Net)",
+      "source": {
+        "sql": "SELECT CAST(saletime AS DATE) AS SALE_DATE, SUM(pricepaid) AS REVENUE, SUM(pricepaid - COALESCE(commission, 0)) AS NET_REVENUE FROM samples.tickit.sales GROUP BY SALE_DATE ORDER BY SALE_DATE"
+      },
+      "vega": {
+        "transform": [
+          {
+            "fold": [
+              "REVENUE",
+              "NET_REVENUE"
+            ],
+            "as": [
+              "Metric",
+              "Value"
+            ]
+          }
+        ],
+        "mark": "line",
+        "encoding": {
+          "x": {
+            "field": "SALE_DATE",
+            "type": "temporal",
+            "title": "Date"
+          },
+          "y": {
+            "field": "Value",
+            "type": "quantitative",
+            "title": "Revenue ($)"
+          },
+          "color": {
+            "field": "Metric",
+            "type": "nominal",
+            "title": "Metric"
+          },
+          "tooltip": [
+            {
+              "field": "SALE_DATE",
+              "type": "temporal"
+            },
+            {
+              "field": "Metric",
+              "type": "nominal"
+            },
+            {
+              "field": "Value",
+              "type": "quantitative"
+            }
+          ]
+        }
+      }
+    },
+    "monthly-revenue": {
+      "id": "monthly-revenue",
+      "type": "chart",
+      "title": "Monthly Revenue & Tickets Sold",
+      "source": {
+        "sql": "SELECT DATE_TRUNC('month', saletime)::DATE AS SALE_MONTH, SUM(pricepaid) AS REVENUE, SUM(qtysold) AS TICKETS_SOLD FROM samples.tickit.sales GROUP BY SALE_MONTH ORDER BY SALE_MONTH"
+      },
+      "vega": {
+        "layer": [
+          {
+            "mark": {
+              "type": "bar",
+              "opacity": 0.7
+            },
+            "encoding": {
+              "x": {
+                "field": "SALE_MONTH",
+                "type": "temporal",
+                "title": "Month"
+              },
+              "y": {
+                "field": "TICKETS_SOLD",
+                "type": "quantitative",
+                "title": "Tickets Sold",
+                "axis": {
+                  "titleColor": "#4c78a8"
+                }
+              },
+              "color": {
+                "value": "#4c78a8"
+              },
+              "tooltip": [
+                {
+                  "field": "SALE_MONTH",
+                  "type": "temporal"
+                },
+                {
+                  "field": "TICKETS_SOLD",
+                  "type": "quantitative"
+                }
+              ]
+            }
+          },
+          {
+            "mark": {
+              "type": "line",
+              "color": "#f58518",
+              "strokeWidth": 2,
+              "point": true
+            },
+            "encoding": {
+              "x": {
+                "field": "SALE_MONTH",
+                "type": "temporal"
+              },
+              "y": {
+                "field": "REVENUE",
+                "type": "quantitative",
+                "title": "Revenue ($)",
+                "axis": {
+                  "titleColor": "#f58518"
+                }
+              },
+              "tooltip": [
+                {
+                  "field": "SALE_MONTH",
+                  "type": "temporal"
+                },
+                {
+                  "field": "REVENUE",
+                  "type": "quantitative"
+                }
+              ]
+            }
+          }
+        ],
+        "resolve": {
+          "scale": {
+            "y": "independent"
+          }
+        }
+      }
+    },
+    "top-events": {
+      "id": "top-events",
+      "type": "chart",
+      "title": "Top 10 Events by Revenue",
+      "source": {
+        "sql": "SELECT eventid::VARCHAR AS EVENT_ID, SUM(pricepaid) AS REVENUE, SUM(qtysold) AS TICKETS_SOLD FROM samples.tickit.sales GROUP BY eventid ORDER BY REVENUE DESC LIMIT 10"
+      },
+      "vega": {
+        "mark": "bar",
+        "encoding": {
+          "x": {
+            "field": "REVENUE",
+            "type": "quantitative",
+            "title": "Revenue ($)"
+          },
+          "y": {
+            "field": "EVENT_ID",
+            "type": "nominal",
+            "sort": "-x",
+            "title": "Event"
+          },
+          "tooltip": [
+            {
+              "field": "EVENT_ID",
+              "type": "nominal"
+            },
+            {
+              "field": "REVENUE",
+              "type": "quantitative"
+            },
+            {
+              "field": "TICKETS_SOLD",
+              "type": "quantitative"
+            }
+          ]
+        }
+      }
+    },
+    "ticket-size": {
+      "id": "ticket-size",
+      "type": "chart",
+      "title": "Order Size Distribution (Avg Price per Ticket)",
+      "source": {
+        "sql": "SELECT CASE WHEN qtysold = 1 THEN '1' WHEN qtysold BETWEEN 2 AND 3 THEN '2-3' WHEN qtysold BETWEEN 4 AND 6 THEN '4-6' ELSE '7+' END AS QTY_BUCKET, COUNT(*) AS ORDERS, ROUND(AVG(pricepaid / NULLIF(qtysold, 0)), 2) AS AVG_PRICE_PER_TICKET FROM samples.tickit.sales GROUP BY QTY_BUCKET ORDER BY CASE QTY_BUCKET WHEN '1' THEN 1 WHEN '2-3' THEN 2 WHEN '4-6' THEN 3 ELSE 4 END"
+      },
+      "vega": {
+        "mark": "bar",
+        "encoding": {
+          "x": {
+            "field": "QTY_BUCKET",
+            "type": "ordinal",
+            "title": "Tickets per Order",
+            "sort": [
+              "1",
+              "2-3",
+              "4-6",
+              "7+"
+            ]
+          },
+          "y": {
+            "field": "ORDERS",
+            "type": "quantitative",
+            "title": "# Orders"
+          },
+          "color": {
+            "field": "AVG_PRICE_PER_TICKET",
+            "type": "quantitative",
+            "title": "Avg Price/Ticket ($)"
+          },
+          "tooltip": [
+            {
+              "field": "QTY_BUCKET",
+              "type": "ordinal"
+            },
+            {
+              "field": "ORDERS",
+              "type": "quantitative"
+            },
+            {
+              "field": "AVG_PRICE_PER_TICKET",
+              "type": "quantitative"
+            }
+          ]
+        }
+      }
+    },
+    "top-sellers": {
+      "id": "top-sellers",
+      "type": "table",
+      "title": "Top 10 Sellers by Net Revenue",
+      "source": {
+        "sql": "SELECT sellerid AS SELLER_ID, COUNT(*) AS ORDERS, SUM(qtysold) AS TICKETS_SOLD, ROUND(SUM(pricepaid), 2) AS GROSS_REVENUE, ROUND(SUM(pricepaid - COALESCE(commission, 0)), 2) AS NET_REVENUE, ROUND(CASE WHEN SUM(pricepaid) = 0 THEN 0 ELSE SUM(COALESCE(commission, 0)) / SUM(pricepaid) END * 100, 1) AS COMMISSION_RATE_PCT FROM samples.tickit.sales GROUP BY sellerid ORDER BY NET_REVENUE DESC LIMIT 10"
+      },
+      "columns": [
+        "SELLER_ID",
+        "ORDERS",
+        "TICKETS_SOLD",
+        "GROSS_REVENUE",
+        "NET_REVENUE",
+        "COMMISSION_RATE_PCT"
+      ]
+    }
+  },
+  "layout": {
+    "default": [
+      {
+        "w": 3,
+        "h": 2,
+        "x": 0,
+        "y": 0,
+        "i": "kpi-revenue",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 3,
+        "h": 2,
+        "x": 3,
+        "y": 0,
+        "i": "kpi-tickets",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 3,
+        "h": 2,
+        "x": 6,
+        "y": 0,
+        "i": "kpi-buyers",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 3,
+        "h": 2,
+        "x": 9,
+        "y": 0,
+        "i": "kpi-events",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 12,
+        "h": 5,
+        "x": 0,
+        "y": 2,
+        "i": "daily-revenue",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 12,
+        "h": 5,
+        "x": 0,
+        "y": 7,
+        "i": "monthly-revenue",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 6,
+        "h": 5,
+        "x": 0,
+        "y": 12,
+        "i": "top-events",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 6,
+        "h": 5,
+        "x": 6,
+        "y": 12,
+        "i": "ticket-size",
+        "moved": false,
+        "static": false
+      },
+      {
+        "w": 12,
+        "h": 4,
+        "x": 0,
+        "y": 17,
+        "i": "top-sellers",
+        "moved": false,
+        "static": false
+      }
+    ]
+  }
+}
